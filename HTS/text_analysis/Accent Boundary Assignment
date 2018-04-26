@@ -1,0 +1,87 @@
+http://www.festvox.org/bsv/x1750.html
+
+Accent/Boundary Assignment
+
+ Accent and boundary tones are what we will use, hopefully in a theory independent way, to refer to the two main types of intonation event. For English, and for many other languages the prediction of position of the accents and boundaries can be done as an independent process from F0 contour generation itself. This is definite true from the major theories we will be considering.
+
+As with phrase break prediction there are some simple rules that will go a surprisingly long way. And as with most of the other statistical learning techniques simple rules cover most of the work, more complex rules work better, but the best results are from using the sorts of information you were using in rules but statistically training them from a appropriate data.
+
+
+For English the placement of accents on stressed syllables in all content words is a quite reasonable approximation achieving about 80% accuracy on typical databases. [hirschberg90] is probably the best example of a detailed rule driven approach (for English). CART trees based on the sorts of features Hirschberg uses are quite reasonable. Though eventual these rules become limiting and a richer knowledge source is required to assign accent patterns to complex nominals (see [sproat90}].
+
+However all these techniques quickly come to the stumbling block that although simple so-called discourse neutral intonation is relatively easy achieve, achieving realistic, natural accent placement is still beyond our synthesis systems (though perhaps not for much longer).
+
+The simplest rule for English may be reasonable for other languages. There are even simpler solutions to this, such as fixed prosody, or fixed declination, but apart from debugging a voice these are simpler than is required even for the most basic voices.
+
+For English, adding a simple hat accent on lexically stressed syllables in all content words works surprisingly well. To do this in Festival you need a CART tree to predict accentedness, and rules to add the hat accent (though we will leave out F0 generation until the next section).
+
+A basic tree that predicts accents of stressed syllables in content words is
+
+(set! simple_accent_cart_tree
+  '
+  (
+   (R:SylStructure.parent.gpos is content)
+    ( (stress is 1)
+       ((Accented))
+       ((NONE))
+    )
+  )
+)
+
+The above tree simply distinguishes accented syllables from non-accented. In theories like ToBI [silverman92], a number of different types of accent are supported. ToBI, with variations, has been applied to a number of languages and may be suitable for yours. However, although accent and boundary types have been identified for various languages and dialects, a computational mechanism for generating and F0 contour from an accent specification often has not yet been specified (we will discuss this more fully below).
+If the above is considered too naive a more elaborate hand specified tree can also be written, using relevant factors, probably similar to those used in [hirschberg90]. Following that, training from data is the next option. Assuming a database exists and has been labeled with discrete accent classifications, we can extract data from it for training a CART tree with wagon. We will build the tree in festival/accents/. First we need a file listing the features that are felt to affect accenting. For this we will predict accents on syllables as that has been used for the English voices created so far, but there is an argument for predict accent placement on a word basis as although accents will need to be syllable aligned, which syllable in a word gets the accent is reasonably well defined (at least compared with predicting accent placement).
+
+A possible list of features for accent prediction is put in the file accent.feats.
+
+R:Intonation.daughter1.name
+R:SylStructure.parent.R:Word.p.gpos
+R:SylStructure.parent.gpos
+R:SylStructure.parent.R:Word.n.gpos
+ssyl_in
+syl_in
+ssyl_out
+syl_out
+p.stress
+stress
+n.stress
+pp.syl_break
+p.syl_break
+syl_break
+n.syl_break
+nn.syl_break
+pos_in_word
+position_type
+
+We can extract these features from the utterances using the Festival script dumpfeats
+dumpfeats -feats accent.feats -relation Syllable \
+      -output accent.data ../utts/*.utts
+
+We now need a description file for the features which can be approximated by the speech tools script make_wagon_desc
+make_wagon_desc accent.data accent.feat accent.desc
+
+Because this script cannot determine if a feature is categorical, if takes an range of values you must hand edit the output file and change any feature to float or int if that is what it is.
+The next stage is to split the data into training and test sets. If stepwise training is to be used for building the CART tree (which is recommended) then the training data should be further split
+
+traintest accent.data
+traintest accent.data.train
+
+Deciding on a stop value for training depends on the number of examples, though this can be tuned to ensure over-training isn't happening.
+wagon -data accent.data.train.train -desc accent.desc \
+   -test accent.data.train.test -stop 10 -stepwise -output accent.tree
+wagon_test -data accent.data.test -desc  accent.desc \
+   -tree accent.tree
+
+This above is designed to predict accents, and similar tree should be used to predict boundary tones as well. For the most part intonation boundaries are defined to occur at prosodic phrase boundaries so that task is somewhat easier, though if you have a number of boundary tone types in your inventory then the prediction is not so straightforward.
+
+
+ When training ToBI type accent types it is not easy to get the right type of variation in the accent types. Although some ToBI labels have been associated with semantic intentions and including discourse information has been shown help prediction (e.g. [black97a}], getting this acceptably correct is not easy. Various techniques in modifying the training data do seem to help. Because of the low incidence of "L*" labels in at least the f2b data, duplicating all sample points in the training data with L's does increase the likelihood of prediction and does seem to give a more varied distribution. Alternatively wagon returns a probability distribution for the accents, normally the most probable is selected, this could be modified to select from the distribution randomly based on their probabilities.
+
+Once trees have been built they can be used in a voices as follows. Within the voice definition function
+
+   (set! int_accent_cart_tree simple_accent_cart_tree)
+   (set! int_tone_cart_tree simple_tone_cart_tree)
+   (Parameter.set 'Int_Method Intonation_Tree)
+
+or if only one tree is required you can use the simpler intonation method
+   (set! int_accent_cart_tree simple_accent_cart_tree)
+   (Parameter.set 'Int_Method Intonation_Simple)
