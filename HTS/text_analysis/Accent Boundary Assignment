@@ -84,4 +84,4 @@ Once trees have been built they can be used in a voices as follows. Within the v
 
 or if only one tree is required you can use the simpler intonation method
    (set! int_accent_cart_tree simple_accent_cart_tree)
-   (Parameter.set 'Int_Method Intonation_Simple)
+   (Parameter.set 'Int_Method Intonation_Simple) 
