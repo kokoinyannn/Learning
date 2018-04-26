@@ -1,0 +1,138 @@
+http://festvox.org/docs/manual-2.4.0/festival_8.html#Scheme
+
+[ < ]	[ > ]	 	[ << ]	[ Up ]	[ >> ]	 	 	 	 	[Top]	[Contents]	[Index]	[ ? ]
+8. Scheme
+Many people seem daunted by the fact that Festival uses Scheme as its scripting language and feel they can’t use Festival because they don’t know Scheme. However most of those same people use Emacs everyday which also has (a much more complex) Lisp system underneath. The number of Scheme commands you actually need to know in Festival is really very small and you can easily just find out as you go along. Also people use the Unix shell often but only know a small fraction of actual commands available in the shell (or in fact that there even is a distinction between shell builtin commands and user definable ones). So take it easy, you’ll learn the commands you need fairly quickly.
+
+8.1 Scheme references	  	Places to learn more about Scheme
+8.2 Scheme fundamentals	  	Syntax and semantics
+8.3 Scheme Festival specifics	  	
+8.4 Scheme I/O	  	
+[ < ]	[ > ]	 	[ << ]	[ Up ]	[ >> ]	 	 	 	 	[Top]	[Contents]	[Index]	[ ? ]
+8.1 Scheme references
+If you wish to learn about Scheme in more detail I recommend the book abelson85.
+
+The Emacs Lisp documentation is reasonable as it is comprehensive and many of the underlying uses of Scheme in Festival were influenced by Emacs. Emacs Lisp however is not Scheme so there are some differences.
+
+Other Scheme tutorials and resources available on the Web are
+
+The Revised Revised Revised Revised Scheme Report, the document defining the language is available from
+ 	
+http://tinuviel.cs.wcu.edu/res/ldp/r4rs-html/r4rs_toc.html
+a Scheme tutorials from the net:
+http://www.cs.uoregon.edu/classes/cis425/schemeTutorial.html
+the Scheme FAQ
+http://www.landfield.com/faqs/scheme-faq/part1/
+[ < ]	[ > ]	 	[ << ]	[ Up ]	[ >> ]	 	 	 	 	[Top]	[Contents]	[Index]	[ ? ]
+8.2 Scheme fundamentals
+But you want more now, don’t you, not just be referred to some other book. OK here goes.
+
+Syntax: an expression is an atom or a list. A list consists of a left paren, a number of expressions and right paren. Atoms can be symbols, numbers, strings or other special types like functions, hash tables, arrays, etc.
+
+Semantics: All expressions can be evaluated. Lists are evaluated as function calls. When evaluating a list all the members of the list are evaluated first then the first item (a function) is called with the remaining items in the list as arguments. Atoms are evaluated depending on their type: symbols are evaluated as variables returning their values. Numbers, strings, functions, etc. evaluate to themselves.
+
+Comments are started by a semicolon and run until end of line.
+
+And that’s it. There is nothing more to the language that. But just in case you can’t follow the consequences of that, here are some key examples.
+
+ 	
+festival> (+ 2 3)
+5
+festival> (set! a 4)
+4
+festival> (* 3 a)
+12
+festival> (define (add a b) (+ a b))
+#<CLOSURE (a b) (+ a b)>
+festival> (add 3 4)
+7
+festival> (set! alist '(apples pears bananas))
+(apples pears bananas)
+festival> (car alist)
+apples
+festival> (cdr alist)
+(pears bananas)
+festival> (set! blist (cons 'oranges alist))
+(oranges apples pears bananas)
+festival> (append alist blist)
+(apples pears bananas oranges apples pears bananas)
+festival> (cons alist blist)
+((apples pears bananas) oranges apples pears bananas)
+festival> (length alist)
+3
+festival> (length (append alist blist))
+7
+[ < ]	[ > ]	 	[ << ]	[ Up ]	[ >> ]	 	 	 	 	[Top]	[Contents]	[Index]	[ ? ]
+8.3 Scheme Festival specifics
+There a number of additions to SIOD that are Festival specific though still part of the Lisp system rather than the synthesis functions per se.
+
+By convention if the first statement of a function is a string, it is treated as a documentation string. The string will be printed when help is requested for that function symbol.
+
+In interactive mode if the function :backtrace is called (within parenthesis) the previous stack trace is displayed. Calling :backtrace with a numeric argument will display that particular stack frame in full. Note that any command other than :backtrace will reset the trace. You may optionally call
+
+ 	
+(set_backtrace t)
+Which will cause a backtrace to be displayed whenever a Scheme error occurs. This can be put in your ‘.festivalrc’ if you wish. This is especially useful when running Festival in non-interactive mode (batch or script mode) so that more information is printed when an error occurs.
+
+A hook in Lisp terms is a position within some piece of code where a user may specify their own customization. The notion is used heavily in Emacs. In Festival there a number of places where hooks are used. A hook variable contains either a function or list of functions that are to be applied at some point in the processing. For example the after_synth_hooks are applied after synthesis has been applied to allow specific customization such as resampling or modification of the gain of the synthesized waveform. The Scheme function apply_hooks takes a hook variable as argument and an object and applies the function/list of functions in turn to the object.
+
+When an error occurs in either Scheme or within the C++ part of Festival by default the system jumps to the top level, resets itself and continues. Note that errors are usually serious things, pointing to bugs in parameters or code. Every effort has been made to ensure that the processing of text never causes errors in Festival. However when using Festival as a development system it is often that errors occur in code.
+
+Sometimes in writing Scheme code you know there is a potential for an error but you wish to ignore that and continue on to the next thing without exiting or stopping and returning to the top level. For example you are processing a number of utterances from a database and some files containing the descriptions have errors in them but you want your processing to continue through every utterance that can be processed rather than stopping 5 minutes after you gone home after setting a big batch job for overnight.
+
+Festival’s Scheme provides the function unwind-protect which allows the catching of errors and then continuing normally. For example suppose you have the function process_utt which takes a filename and does things which you know might cause an error. You can write the following to ensure you continue processing even in an error occurs.
+
+ 	
+(unwind-protect
+ (process_utt filename) 
+ (begin
+   (format t "Error found in processing %s\n" filename)
+   (format t "continuing\n")))
+The unwind-protect function takes two arguments. The first is evaluated and if no error occurs the value returned from that expression is returned. If an error does occur while evaluating the first expression, the second expression is evaluated. unwind-protect may be used recursively. Note that all files opened while evaluating the first expression are closed if an error occurs. All global variables outside the scope of the unwind-protect will be left as they were set up until the error. Care should be taken in using this function but its power is necessary to be able to write robust Scheme code.
+
+[ < ]	[ > ]	 	[ << ]	[ Up ]	[ >> ]	 	 	 	 	[Top]	[Contents]	[Index]	[ ? ]
+8.4 Scheme I/O
+Different Scheme’s may have quite different implementations of file i/o functions so in this section we will describe the basic functions in Festival SIOD regarding i/o.
+
+Simple printing to the screen may be achieved with the function print which prints the given s-expression to the screen. The printed form is preceded by a new line. This is often useful for debugging but isn’t really powerful enough for much else.
+
+Files may be opened and closed and referred to file descriptors in a direct analogy to C’s stdio library. The SIOD functions fopen and fclose work in the exactly the same way as their equivalently named partners in C.
+
+The format command follows the command of the same name in Emacs and a number of other Lisps. C programmers can think of it as fprintf. format takes a file descriptor, format string and arguments to print. The file description may be a file descriptor as returned by the Scheme function fopen, it may also be t which means the output will be directed as standard out (cf. printf). A third possibility is nil which will cause the output to printed to a string which is returned (cf. sprintf).
+
+The format string closely follows the format strings in ANSI C, but it is not the same. Specifically the directives currently supported are, %%, %d, %x, %s, %f, %g and %c. All modifiers for these are also supported. In addition %l is provided for printing of Scheme objects as objects.
+
+For example
+
+ 	
+(format t "%03d %3.4f %s %l %l %l\n" 23 23 "abc" "abc" '(a b d) utt1)
+will produce
+
+ 	
+023 23.0000 abc "abc" (a b d) #<Utterance 32f228>
+on standard output.
+
+When large lisp expressions are printed they are difficult to read because of the parentheses. The function pprintf prints an expression to a file description (or t for standard out). It prints so the s-expression is nicely lined up and indented. This is often called pretty printing in Lisps.
+
+For reading input from terminal or file, there is currently no equivalent to scanf. Items may only be read as Scheme expressions. The command
+
+ 	
+(load FILENAME t)
+will load all s-expressions in FILENAME and return them, unevaluated as a list. Without the third argument the load function will load and evaluate each s-expression in the file.
+
+To read individual s-expressions use readfp. For example
+
+ 	
+(let ((fd (fopen trainfile "r"))
+      (entry)
+      (count 0))
+    (while (not (equal? (set! entry (readfp fd)) (eof-val)))
+     (if (string-equal (car entry) "home")
+        (set! count (+ 1 count))))
+    (fclose fd))
+To convert a symbol whose print name is a number to a number use parse-number. This is the equivalent to atof in C.
+
+Note that, all i/o from Scheme input files is assumed to be basically some form of Scheme data (though can be just numbers, tokens). For more elaborate analysis of incoming data it is possible to use the text tokenization functions which offer a fully programmable method of reading data.
+
+[ << ]	[ >> ]	 	 	 	 	 	[Top]	[Contents]	[Index]	[ ? ]
+This document was generated by Alan W Black on December 2, 2014 using texi2html 1.82. 
